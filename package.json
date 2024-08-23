@@ -1,12 +1,12 @@
 {
-	"name": "gossip",
+	"name": "@drecchia/gossip",
 	"version": "1.0.0",
 	"author": "Danilo T. Recchia <danilo.recchia@vortus.solutions>",
 	"main": "dist/js/gossip-min.js",
 	"license": "CC-BY-NC-4.0",
 	"repository": {
 		"type": "git",
-		"url": "https://github.com/drecchia/gossip.git"
+		"url": "git+https://github.com/drecchia/gossip.git"
 	},
 	"description": "Hyper Parametrizable Vanilla filterbar, the best independent filter selection tool.",
 	"keywords": [
