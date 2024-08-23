@@ -22,13 +22,13 @@ const AllInOne = (cb, input, output) => {
         .pipe(babel({
             presets: ['@babel/env']
         }))
-        .pipe(concat('all.js'))
+        .pipe(concat('gossip.js'))
         .pipe(minify({
             ext: {
                 src: '-debug.js',
-                min: '.js'
+                min: '-min.js'
             },
-            noSource: true  // This will only output the minified file
+            noSource: false
         }))
         .on('error', function(err) {
             console.error('Error in minify:', err.toString());

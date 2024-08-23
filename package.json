@@ -2,7 +2,7 @@
 	"name": "gossip",
 	"version": "1.0.0",
 	"author": "Danilo T. Recchia <danilo.recchia@vortus.solutions>",
-	"main": "dist/js/all.min.js",
+	"main": "dist/js/gossip-min.js",
 	"license": "CC-BY-NC-4.0",
 	"repository": {
 		"type": "git",
