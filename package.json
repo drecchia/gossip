@@ -1,0 +1,33 @@
+{
+	"name": "gossip",
+	"version": "1.0.0",
+	"author": "Danilo T. Recchia <danilo.recchia@vortus.solutions>",
+	"main": "dist/js/all.min.js",
+	"license": "CC-BY-NC-4.0",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/drecchia/gossip.git"
+	},
+	"description": "Hyper Parametrizable Vanilla filterbar, the best independent filter selection tool.",
+	"keywords": [
+		"gossip",
+		"wisper",
+		"audit",
+		"log",
+		"remote log"
+	],
+	"scripts": {
+		"build": "gulp default"
+	},
+	"devDependencies": {
+		"@babel/core": "^7.25.2",
+		"@babel/preset-env": "^7.25.4",
+		"gulp": "^4.0.2",
+		"gulp-autoprefixer": "^8.0.0",
+		"gulp-babel": "^8.0.0",
+		"gulp-clean-css": "^4.3.0",
+		"gulp-concat": "^2.6.1",
+		"gulp-minify": "^3.1.0",
+		"gulp-uglify": "^3.0.2"
+	}
+}
