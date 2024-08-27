@@ -123,7 +123,7 @@ var Gossip = /*#__PURE__*/function () {
         return false;
       }
       var existingData = this.safeGetItem(this.localStorageKey);
-      if (!existingData) return false; // No data to send
+      if (!existingData) return true; // No data to send
 
       lockFn();
       moveDataFn(this.localStorageKey, this.localStorageTmpKey);
