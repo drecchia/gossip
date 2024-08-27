@@ -48,10 +48,36 @@ class Gossip {
 
 	// schedule auto-publishing of data
 	static autoPublish(url, method = 'POST', headers = {}, interval = 30000) {
-		setInterval(() => {
-			this.publish(url, method, headers);
-		}, interval);
-	}
+        let failedAttempts = 0;
+        let lastDataSize = 0;
+
+        const checkAndPublish = () => {
+            const currentData = this.safeGetItem(this.localStorageKey);
+            const currentDataSize = currentData ? JSON.parse(currentData).length : 0;
+
+            if (failedAttempts >= 5 && currentDataSize === lastDataSize) {
+                console.log('Max failures reached and no new data. Skipping publish attempt.');
+                return;
+            }
+
+            if (currentDataSize !== lastDataSize) {
+                failedAttempts = 0; // Reset failed attempts if data size changed
+                lastDataSize = currentDataSize;
+            }
+
+            const success = this.publish(url, method, headers);
+
+            if (!success) {
+                failedAttempts++;
+                console.error(`Publish attempt failed. Total failed attempts: ${failedAttempts}`);
+            } else {
+                failedAttempts = 0; // Reset failed attempts on success
+                lastDataSize = 0; // Reset last data size on successful publish
+            }
+        };
+
+        setInterval(checkAndPublish, interval);
+    }
 
 	// Deliver data to the remote server
 	static publish(url, method = 'POST', headers = {}) {
@@ -74,11 +100,11 @@ class Gossip {
 
 		if (isLockedFn()) {
 			console.log('Delivery is locked, skipping...');
-			return;
+			return false;
 		}
 
 		const existingData = this.safeGetItem(this.localStorageKey);
-		if (!existingData) return; // No data to send
+		if (!existingData) return false; // No data to send
 
 		lockFn();
 		moveDataFn(this.localStorageKey, this.localStorageTmpKey);
@@ -95,7 +121,10 @@ class Gossip {
 				if (!response.ok) {
 					throw new Error(`Failed to publish data: ${response.status} - ${response.statusText}`);
 				}
+				
 				this.safeRemoveItem(this.localStorageTmpKey); // Clear storage on successful publish
+				
+				return true;
 			})
 			.catch(error => {
 				console.error('Publish error:', error);
@@ -107,6 +136,8 @@ class Gossip {
 
 				this.safeSetItem(this.localStorageKey, JSON.stringify(mergedLogs));
 				this.safeRemoveItem(this.localStorageTmpKey);
+
+				return false;
 			})
 			.finally(() => {
 				this.safeRemoveItem(this.localStorageLockKey); // Clear lock
