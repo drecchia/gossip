@@ -72,9 +72,29 @@ var Gossip = /*#__PURE__*/function () {
       var method = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 'POST';
       var headers = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : {};
       var interval = arguments.length > 3 && arguments[3] !== undefined ? arguments[3] : 30000;
-      setInterval(function () {
-        _this.publish(url, method, headers);
-      }, interval);
+      var failedAttempts = 0;
+      var lastDataSize = 0;
+      var checkAndPublish = function checkAndPublish() {
+        var currentData = _this.safeGetItem(_this.localStorageKey);
+        var currentDataSize = currentData ? JSON.parse(currentData).length : 0;
+        if (failedAttempts >= 5 && currentDataSize === lastDataSize) {
+          console.log('Max failures reached and no new data. Skipping publish attempt.');
+          return;
+        }
+        if (currentDataSize !== lastDataSize) {
+          failedAttempts = 0; // Reset failed attempts if data size changed
+          lastDataSize = currentDataSize;
+        }
+        var success = _this.publish(url, method, headers);
+        if (!success) {
+          failedAttempts++;
+          console.error("Publish attempt failed. Total failed attempts: ".concat(failedAttempts));
+        } else {
+          failedAttempts = 0; // Reset failed attempts on success
+          lastDataSize = 0; // Reset last data size on successful publish
+        }
+      };
+      setInterval(checkAndPublish, interval);
     }
 
     // Deliver data to the remote server
@@ -100,10 +120,10 @@ var Gossip = /*#__PURE__*/function () {
       };
       if (isLockedFn()) {
         console.log('Delivery is locked, skipping...');
-        return;
+        return false;
       }
       var existingData = this.safeGetItem(this.localStorageKey);
-      if (!existingData) return; // No data to send
+      if (!existingData) return false; // No data to send
 
       lockFn();
       moveDataFn(this.localStorageKey, this.localStorageTmpKey);
@@ -118,6 +138,8 @@ var Gossip = /*#__PURE__*/function () {
           throw new Error("Failed to publish data: ".concat(response.status, " - ").concat(response.statusText));
         }
         _this2.safeRemoveItem(_this2.localStorageTmpKey); // Clear storage on successful publish
+
+        return true;
       })["catch"](function (error) {
         console.error('Publish error:', error);
 
@@ -127,6 +149,7 @@ var Gossip = /*#__PURE__*/function () {
         var mergedLogs = newLogsDuringPublish ? JSON.parse(newLogsDuringPublish).concat(tmpLogs) : tmpLogs;
         _this2.safeSetItem(_this2.localStorageKey, JSON.stringify(mergedLogs));
         _this2.safeRemoveItem(_this2.localStorageTmpKey);
+        return false;
       })["finally"](function () {
         _this2.safeRemoveItem(_this2.localStorageLockKey); // Clear lock
       });
