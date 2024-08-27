@@ -104,7 +104,7 @@ class Gossip {
 		}
 
 		const existingData = this.safeGetItem(this.localStorageKey);
-		if (!existingData) return false; // No data to send
+		if (!existingData) return true; // No data to send
 
 		lockFn();
 		moveDataFn(this.localStorageKey, this.localStorageTmpKey);
