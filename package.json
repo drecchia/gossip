@@ -1,6 +1,6 @@
 {
 	"name": "@drecchia/gossip",
-	"version": "1.1.1",
+	"version": "1.1.2",
 	"author": "Danilo T. Recchia <danilo.recchia@vortus.solutions>",
 	"main": "dist/js/gossip-min.js",
 	"license": "CC-BY-NC-4.0",
