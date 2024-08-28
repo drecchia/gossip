@@ -36,7 +36,9 @@ class Gossip {
 		try {
 			const existingData = this.safeGetItem(this.localStorageKey);
 			const dataArray = existingData ? JSON.parse(existingData) : [];
+
 			dataArray.push(jsonObj);
+			
 			this.safeSetItem(this.localStorageKey, JSON.stringify(dataArray));
 		} catch (error) {
 			console.error('Failed to whisper gossip data:', error);
@@ -51,36 +53,42 @@ class Gossip {
         let failedAttempts = 0;
         let lastDataSize = 0;
 
-        const checkAndPublish = () => {
+        const checkAndPublish = async () => {
             const currentData = this.safeGetItem(this.localStorageKey);
             const currentDataSize = currentData ? JSON.parse(currentData).length : 0;
 
+			
             if (failedAttempts >= 5 && currentDataSize === lastDataSize) {
-                console.log('Max failures reached and no new data. Skipping publish attempt.');
+				console.log('Max failures reached and no new data. Skipping publish attempt.');
                 return;
             }
-
+			
             if (currentDataSize !== lastDataSize) {
-                failedAttempts = 0; // Reset failed attempts if data size changed
+				failedAttempts = 0; // Reset failed attempts if data size changed
                 lastDataSize = currentDataSize;
             }
+			
+			try {
+				const success = await this.publish(url, method, headers);
 
-            const success = this.publish(url, method, headers);
-
-            if (!success) {
-                failedAttempts++;
-                console.error(`Publish attempt failed. Total failed attempts: ${failedAttempts}`);
-            } else {
-                failedAttempts = 0; // Reset failed attempts on success
-                lastDataSize = 0; // Reset last data size on successful publish
-            }
+				if (!success) {
+					failedAttempts++;
+					console.error(`Publish attempt failed. Total failed attempts: ${failedAttempts}`);
+				} else {
+					failedAttempts = 0; // Reset failed attempts on success
+                	lastDataSize = 0; // Reset last data size on successful publish
+				}
+			} catch (error) {
+				console.error('Error in checkAndPublish:', error);
+				failedAttempts++;
+			}
         };
 
         setInterval(checkAndPublish, interval);
     }
 
 	// Deliver data to the remote server
-	static publish(url, method = 'POST', headers = {}) {
+	static async publish(url, method = 'POST', headers = {}) {
 		const lockFn = () => {
 			this.safeSetItem(this.localStorageLockKey, Date.now().toString());
 		};
@@ -109,38 +117,37 @@ class Gossip {
 		lockFn();
 		moveDataFn(this.localStorageKey, this.localStorageTmpKey);
 
-		fetch(url, {
-			method,
-			headers: {
-				'Content-Type': 'application/json',
-				...headers,
-			},
-			body: existingData,
-		})
-			.then(response => {
-				if (!response.ok) {
-					throw new Error(`Failed to publish data: ${response.status} - ${response.statusText}`);
-				}
-				
-				this.safeRemoveItem(this.localStorageTmpKey); // Clear storage on successful publish
-				
-				return true;
-			})
-			.catch(error => {
-				console.error('Publish error:', error);
-
-				// Merge the temporary data back to the original
-				const newLogsDuringPublish = this.safeGetItem(this.localStorageKey);
-				const tmpLogs = JSON.parse(existingData);
-				const mergedLogs = newLogsDuringPublish ? JSON.parse(newLogsDuringPublish).concat(tmpLogs) : tmpLogs;
-
-				this.safeSetItem(this.localStorageKey, JSON.stringify(mergedLogs));
-				this.safeRemoveItem(this.localStorageTmpKey);
-
-				return false;
-			})
-			.finally(() => {
-				this.safeRemoveItem(this.localStorageLockKey); // Clear lock
+		try {
+			const response = await fetch(url, {
+				method,
+				headers: {
+					'Content-Type': 'application/json',
+					...headers,
+				},
+				body: existingData,
 			});
+		
+			if (!response.ok) {
+				throw new Error(`Failed to publish data: ${response.status} - ${response.statusText}`);
+			}
+			
+			this.safeRemoveItem(this.localStorageTmpKey);
+
+			return true;
+		} catch (error) {
+			console.error('Publish error:', error);
+			
+			// Merge the temporary data back to the original
+			const newLogsDuringPublish = this.safeGetItem(this.localStorageKey);
+			const tmpLogs = JSON.parse(existingData);
+			const mergedLogs = newLogsDuringPublish ? JSON.parse(newLogsDuringPublish).concat(tmpLogs) : tmpLogs;
+
+			this.safeSetItem(this.localStorageKey, JSON.stringify(mergedLogs));
+			this.safeRemoveItem(this.localStorageTmpKey);
+
+			return false;
+		} finally {
+			this.safeRemoveItem(this.localStorageLockKey);
+		}
 	}
 };
