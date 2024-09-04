@@ -56,6 +56,10 @@ var Gossip = /*#__PURE__*/function () {
     key: "whisper",
     value: function whisper(jsonObj) {
       try {
+        if (!sessionStorage.getItem(this.sessionStorageTabKey)) {
+          sessionStorage.setItem(this.sessionStorageTabKey, "tab-".concat(Date.now(), "-").concat(Math.random()));
+        }
+        jsonObj.tabId = sessionStorage.getItem(this.sessionStorageTabKey);
         var existingData = this.safeGetItem(this.localStorageKey);
         var dataArray = existingData ? JSON.parse(existingData) : [];
         dataArray.push(jsonObj);
@@ -233,4 +237,5 @@ var Gossip = /*#__PURE__*/function () {
 _defineProperty(Gossip, "localStorageKey", 'gossipQueue');
 _defineProperty(Gossip, "localStorageTmpKey", 'gossipTmpQueue');
 _defineProperty(Gossip, "localStorageLockKey", 'gossipLockedSince');
+_defineProperty(Gossip, "sessionStorageTabKey", 'GossipTabId');
 ;
