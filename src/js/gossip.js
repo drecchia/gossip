@@ -2,6 +2,7 @@ class Gossip {
 	static localStorageKey = 'gossipQueue';
 	static localStorageTmpKey = 'gossipTmpQueue';
 	static localStorageLockKey = 'gossipLockedSince';
+	static sessionStorageTabKey = 'GossipTabId';
 
 	// Helper method to safely access localStorage
 	static safeGetItem(key) {
@@ -34,6 +35,12 @@ class Gossip {
 	// Append data to localStorage
 	static whisper(jsonObj) {
 		try {
+			if (!sessionStorage.getItem(this.sessionStorageTabKey)) {
+				sessionStorage.setItem(this.sessionStorageTabKey, `tab-${Date.now()}-${Math.random()}`);
+			}
+
+			jsonObj.tabId = sessionStorage.getItem(this.sessionStorageTabKey);
+
 			const existingData = this.safeGetItem(this.localStorageKey);
 			const dataArray = existingData ? JSON.parse(existingData) : [];
 
