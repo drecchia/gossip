@@ -1,7 +1,10 @@
 class Gossip {
+	// Constants
+	static MAX_QUEUE_ITEMS = 2000; // Maximum number of items in the queue
 	static localStorageKey = 'gossipQueue';
 	static localStorageTmpKey = 'gossipTmpQueue';
 	static localStorageLockKey = 'gossipLockedSince';
+	static localStorageBrowserIdKey = 'gossipBrowserId';
 	static sessionStorageTabKey = 'GossipTabId';
 
 	// Helper method to safely access localStorage
@@ -32,9 +35,40 @@ class Gossip {
 		}
 	}
 
-	// Append data to localStorage
-	static whisper(jsonObj) {
+	// Check if storage is available
+	static isStorageAvailable() {
 		try {
+			const testKey = '__storage_test__';
+			localStorage.setItem(testKey, testKey);
+			localStorage.removeItem(testKey);
+			return true;
+		} catch (e) {
+			return false;
+		}
+	}
+
+	// Append data to localStorage with FIFO enforcement
+	static whisper(jsonObj) {
+		if (!this.isStorageAvailable()) {
+			console.error('Gossip: LocalStorage is not available.');
+			return false;
+		}
+
+		if (!jsonObj || typeof jsonObj !== 'object') {
+			console.error('Gossip: Invalid input, expected an object');
+			return false;
+		}
+
+		try {
+			// Generate browserId if it doesn't exist
+			if (!this.safeGetItem(this.localStorageBrowserIdKey)) {
+				const clientId = crypto?.randomUUID ? crypto.randomUUID() : `b-${Date.now()}-${Math.random()}`;
+				this.safeSetItem(this.localStorageBrowserIdKey, clientId);
+			}
+
+			jsonObj.browserId = this.safeGetItem(this.localStorageBrowserIdKey);
+
+			// Generate tabId if it doesn't exist
 			if (!sessionStorage.getItem(this.sessionStorageTabKey)) {
 				sessionStorage.setItem(this.sessionStorageTabKey, `tab-${Date.now()}-${Math.random()}`);
 			}
@@ -45,36 +79,41 @@ class Gossip {
 			const dataArray = existingData ? JSON.parse(existingData) : [];
 
 			dataArray.push(jsonObj);
-			
+
+			// Truncate if exceeding the limit
+			if (dataArray.length > this.MAX_QUEUE_ITEMS) {
+				dataArray.splice(0, dataArray.length - this.MAX_QUEUE_ITEMS);
+			}
+
 			this.safeSetItem(this.localStorageKey, JSON.stringify(dataArray));
+			return true;
 		} catch (error) {
 			console.error('Failed to whisper gossip data:', error);
 			return false;
 		}
-
-		return true;
 	}
 
-	// schedule auto-publishing of data
+	// Schedule auto-publishing of data
 	static autoPublish(url, method = 'POST', headers = {}, interval = 30000) {
-        let failedAttempts = 0;
-        let lastDataSize = 0;
+		let failedAttempts = 0;
+		let lastDataSize = 0;
 
-        const checkAndPublish = async () => {
-            const currentData = this.safeGetItem(this.localStorageKey);
-            const currentDataSize = currentData ? JSON.parse(currentData).length : 0;
+		const checkAndPublish = async () => {
+			const currentData = this.safeGetItem(this.localStorageKey);
+			const currentDataSize = currentData ? JSON.parse(currentData).length : 0;
 
-			
-            if (failedAttempts >= 5 && currentDataSize === lastDataSize) {
+			// Skip if max failures reached and no new data
+			if (failedAttempts >= 5 && currentDataSize === lastDataSize) {
 				console.log('Max failures reached and no new data. Skipping publish attempt.');
-                return;
-            }
-			
-            if (currentDataSize !== lastDataSize) {
+				return;
+			}
+
+			// Reset failed attempts if data size changed
+			if (currentDataSize !== lastDataSize) {
 				failedAttempts = 0; // Reset failed attempts if data size changed
-                lastDataSize = currentDataSize;
-            }
-			
+				lastDataSize = currentDataSize;
+			}
+
 			try {
 				const success = await this.publish(url, method, headers);
 
@@ -83,16 +122,16 @@ class Gossip {
 					console.error(`Publish attempt failed. Total failed attempts: ${failedAttempts}`);
 				} else {
 					failedAttempts = 0; // Reset failed attempts on success
-                	lastDataSize = 0; // Reset last data size on successful publish
+					lastDataSize = 0; // Reset last data size on successful publish
 				}
 			} catch (error) {
 				console.error('Error in checkAndPublish:', error);
 				failedAttempts++;
 			}
-        };
+		};
 
-        setInterval(checkAndPublish, interval);
-    }
+		setInterval(checkAndPublish, interval);
+	}
 
 	// Deliver data to the remote server
 	static async publish(url, method = 'POST', headers = {}) {
@@ -133,17 +172,16 @@ class Gossip {
 				},
 				body: existingData,
 			});
-		
+
 			if (!response.ok) {
 				throw new Error(`Failed to publish data: ${response.status} - ${response.statusText}`);
 			}
-			
-			this.safeRemoveItem(this.localStorageTmpKey);
 
+			this.safeRemoveItem(this.localStorageTmpKey);
 			return true;
 		} catch (error) {
 			console.error('Publish error:', error);
-			
+
 			// Merge the temporary data back to the original
 			const newLogsDuringPublish = this.safeGetItem(this.localStorageKey);
 			const tmpLogs = JSON.parse(existingData);
